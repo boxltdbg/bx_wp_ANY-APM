@@ -194,6 +194,7 @@ function box_now_delivery_settings() {
     register_setting('box-now-delivery-settings-group', 'boxnow_client_secret');
     register_setting('box-now-delivery-settings-group', 'boxnow_button_color');
     register_setting('box-now-delivery-settings-group', 'boxnow_button_text');
+    register_setting('box-now-delivery-settings-group', 'boxnow_include_row4');
     register_setting('box-now-delivery-settings-group', 'box_now_display_mode');
     register_setting('box-now-delivery-settings-group', 'boxnow_gps_tracking');
     register_setting('box-now-delivery-settings-group', 'boxnow_voucher_option');
