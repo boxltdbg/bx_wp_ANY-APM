@@ -17,7 +17,9 @@ BOX NOW Delivery is used for connecting e-shops with parcel delivery services fr
 == Changelog ==
 
 = 2.1.4 =
-*Added block based checkout as an option to choose inside admin panel settings.
+* Added block based checkout as an option to choose inside admin panel settings.
+* Added functionality to edit locker adress dynamically via the admin panel.
+* Improved UX by showing the real adress in the admin panel inside the box now delivery column info.
 
 = 2.1.3 =
 * Fixed iframe embedded map
