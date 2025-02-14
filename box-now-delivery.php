@@ -201,18 +201,18 @@ if (in_array('woocommerce/woocommerce.php', apply_filters('active_plugins', get_
    * @param WC_Order $order WooCommerce Order.
    */
   function bndp_box_now_delivery_checkout_field_display_admin_order_meta($order)
-  {
+{
     // 1) Check if the order used Box Now shipping
     $shipping_methods = $order->get_shipping_methods();
     $box_now_used = false;
     foreach ($shipping_methods as $shipping_method) {
-      if ($shipping_method->get_method_id() === 'box_now_delivery') {
-        $box_now_used = true;
-        break;
-      }
+        if ($shipping_method->get_method_id() === 'box_now_delivery') {
+            $box_now_used = true;
+            break;
+        }
     }
     if (!$box_now_used) {
-      return;
+        return;
     }
 
     // Existing metadata
@@ -221,22 +221,32 @@ if (in_array('woocommerce/woocommerce.php', apply_filters('active_plugins', get_
 
     // If there's no locker or warehouse, do nothing
     if (empty($locker_id) && empty($warehouse_id)) {
-      return;
+        return;
     }
 
-    // === NEW WAREHOUSE CHECK LOGIC ===
+    // (A) If _boxnow_real_address is missing but we have a locker => fetch it NOW
+    $real_boxnow_address = $order->get_meta('_boxnow_real_address');
+    if (empty($real_boxnow_address) && !empty($locker_id)) {
+        $fetched = boxnow_get_locker_address_line1($locker_id);
+        if (!empty($fetched)) {
+            $order->update_meta_data('_boxnow_real_address', $fetched);
+            $order->save();
+            $real_boxnow_address = $fetched;
+        }
+    }
+
+    // (B) Now do your existing warehouse check
     $warehouse_ids_str = get_option('boxnow_warehouse_id', '');
     $warehouse_ids     = explode(',', str_replace(' ', '', $warehouse_ids_str));
     if (!empty($warehouse_ids)) {
       $current_wh = $order->get_meta('_selected_warehouse');
-      // If empty or not in the plugin's list => overwrite
       if (empty($current_wh) || !in_array($current_wh, $warehouse_ids)) {
         $order->update_meta_data('_selected_warehouse', $warehouse_ids[0]);
         $order->save();
       }
     }
 
-    // Now retrieve token & warehouse data (unchanged logic)
+    // (C) Retrieve token and warehouse data (unchanged logic)
     $api_url   = 'https://' . get_option('boxnow_api_url', '') . '/api/v1/auth-sessions';
     $auth_args = array(
       'method'  => 'POST',
@@ -250,11 +260,17 @@ if (in_array('woocommerce/woocommerce.php', apply_filters('active_plugins', get_
     $response = wp_remote_post($api_url, $auth_args);
     $json     = json_decode(wp_remote_retrieve_body($response), true);
 
+    // Safely get access_token
+    $access_token = '';
+    if (is_array($json) && !empty($json['access_token'])) {
+      $access_token = $json['access_token'];
+    }
+
     $origins_url   = 'https://' . get_option('boxnow_api_url', '') . '/api/v1/origins';
     $origins_args  = array(
       'method'  => 'GET',
       'headers' => array(
-        'Authorization' => 'Bearer ' . $json['access_token'],
+        'Authorization' => 'Bearer ' . $access_token,
         'Content-Type'  => 'application/json'
       )
     );
@@ -268,6 +284,8 @@ if (in_array('woocommerce/woocommerce.php', apply_filters('active_plugins', get_
         $warehouse_names[$wh['id']] = $wh['name'];
       }
     }
+
+    // (D) Display HTML for Box Now in admin
     ?>
     <div class="boxnow_data_column">
       <h4>
@@ -281,12 +299,11 @@ if (in_array('woocommerce/woocommerce.php', apply_filters('active_plugins', get_
         // Номер на автомат
         echo '<p><strong>' . esc_html__('Номер на автомат: ', 'woocommerce') . '</strong>' . esc_html($locker_id) . '</p>';
 
-        // Адрес на автомат (from _boxnow_real_address)
-        $real_boxnow_address = $order->get_meta('_boxnow_real_address');
+        // Адрес на автомат
         if (!empty($real_boxnow_address)) {
           echo '<p><strong>' . esc_html__('Адрес на автомат: ', 'woocommerce') . '</strong>'
-            . esc_html($real_boxnow_address)
-            . '</p>';
+             . esc_html($real_boxnow_address)
+             . '</p>';
         }
 
         // Номер на склад
