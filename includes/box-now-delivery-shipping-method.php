@@ -317,27 +317,68 @@ function box_now_delivery_shipping_method()
              */
             private function has_oversized_products()
             {
-                $custom_weight_limit = floatval($this->settings['custom_weight']);
-                $oversized = false;
+                $custom_weight_limit      = floatval($this->get_option('custom_weight'));
+                $total_volume             = 0;
+                $any_side_exceeds_diagonal = false;
+                $weight_exceeds_limit     = false;
+
+                // Maximum dimensions
+                $max_length = 58; // cm
+                $max_width  = 44; // cm
+                $max_height = 35; // cm
+                $max_diagonal = 80.78; // cm
+                $max_volume = $max_length * $max_width * $max_height; // 58 * 44 * 35 = 89,320 cm³
 
                 // Loop through each item in the cart
                 foreach (WC()->cart->get_cart_contents() as $cart_item) {
-                    $length = $cart_item['data']->get_length();
-                    $width = $cart_item['data']->get_width();
-                    $height = $cart_item['data']->get_height();
+                    $product  = $cart_item['data'];
+                    $quantity = $cart_item['quantity'];
+                    $length   = $product->get_length();
+                    $width    = $product->get_width();
+                    $height   = $product->get_height();
+
+                    // Convert dimensions to floats, default to 0 if empty
+                    $length = is_numeric($length) ? floatval($length) : 0;
+                    $width  = is_numeric($width) ? floatval($width) : 0;
+                    $height = is_numeric($height) ? floatval($height) : 0;
+
+                    // Calculate volume for this item (in cubic centimeters)
+                    $item_volume = $length * $width * $height * $quantity;
+
+                    // Sum up total volume
+                    $total_volume += $item_volume;
+
+                    // Calculate the largest side of the item
+                    $max_side = max($length, $width, $height);
+
+                    // Check if any side exceeds the maximum diagonal
+                    if ($max_side > $max_diagonal) {
+                        $any_side_exceeds_diagonal = true;
+                    }
 
                     // Handle the weight calculation
-                    $weight = $cart_item['data']->get_weight();
-                    //If no weight default to 1 kg.
-                    $weight = is_numeric($weight) ? floatval($weight) : 1; // TO DO: $default_weight = floatval($this->settings['default_weight']);
+                    $weight = $product->get_weight();
+                    // If no weight default to 1 kg.
+                    $weight = is_numeric($weight) ? floatval($weight) * $quantity : 1 * $quantity; // Default weight to 1 kg per item if not set
 
-                    if ($length > $this->settings['max_length'] || $width > $this->settings['max_width'] || $height > $this->settings['max_height'] || $weight > $custom_weight_limit) {
-                        $oversized = true;
-                        break;
+                    // Check if total weight exceeds the custom weight limit
+                    if ($weight > $custom_weight_limit) {
+                        $weight_exceeds_limit = true;
                     }
                 }
-                // Return true if any product has oversized dimensions or if any individual item's weight exceeds the custom weight limit
-                return $oversized;
+
+                // Check if total volume exceeds 89,320 cm³ or any side exceeds 80.78 cm
+                if ($total_volume > $max_volume || $any_side_exceeds_diagonal) {
+                    return true;
+                }
+
+                // Also, return true if total weight exceeds the custom weight limit
+                if ($weight_exceeds_limit) {
+                    return true;
+                }
+
+                // Otherwise, return false (no oversized products)
+                return false;
             }
         }
     }
